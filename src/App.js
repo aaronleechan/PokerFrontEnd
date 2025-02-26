@@ -14,7 +14,7 @@ const App = () => {
     const [isCreator, setIsCreator] = useState(false);
 
     useEffect(() => {
-        const websocket = new WebSocket(process.env.REACT_APP_WEBSOCKET_URL);
+        const websocket = new WebSocket('wss://scrumpokerbackend-e9dzf5ajeaffgygu.westus2-01.azurewebsites.net/');
         setWs(websocket);
 
         websocket.onmessage = (event) => {
