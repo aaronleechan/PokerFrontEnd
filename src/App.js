@@ -14,65 +14,98 @@ const App = () => {
     const [isCreator, setIsCreator] = useState(false);
 
     useEffect(() => {
-        const websocket = new WebSocket('wss://scrumpokerbackend-e9dzf5ajeaffgygu.westus2-01.azurewebsites.net/');
-        setWs(websocket);
+        const connectWebSocket = () => {
+            const websocket = new WebSocket(process.env.REACT_APP_WEBSOCKET_URL || 'ws://localhost:8080');
+            setWs(websocket);
 
-        websocket.onmessage = (event) => {
-            const data = JSON.parse(event.data);
-            if (data.type === 'roomCreated') {
-                setRoomId(data.roomId);
-                setTitle(data.title);
-                setIsCreator(true);
-            } else if (data.type === 'joined') {
-                setTitle(data.title);
-                setVotes(data.votes);
-                setRevealed(data.revealed);
-            } else if (data.type === 'update' && data.roomId === roomId) {
-                setTitle(data.title);
-                setVotes(data.votes);
-                setRevealed(data.revealed);
-            } else if (data.type === 'error') {
-                setError(data.message);
-            }
+            websocket.onopen = () => {
+                console.log('WebSocket connection established');
+                setError(''); // Clear any previous errors
+            };
+
+            websocket.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                if (data.type === 'roomCreated') {
+                    setRoomId(data.roomId);
+                    setTitle(data.title);
+                    setIsCreator(true);
+                } else if (data.type === 'joined') {
+                    setTitle(data.title);
+                    setVotes(data.votes);
+                    setRevealed(data.revealed);
+                } else if (data.type === 'update' && data.roomId === roomId) {
+                    setTitle(data.title);
+                    setVotes(data.votes);
+                    setRevealed(data.revealed);
+                } else if (data.type === 'error') {
+                    setError(data.message);
+                }
+            };
+
+            websocket.onerror = () => {
+                setError('WebSocket connection failed');
+            };
+
+            websocket.onclose = () => {
+                console.log('WebSocket closed');
+                setWs(null);
+                setTimeout(connectWebSocket, 2000); // Attempt to reconnect after 2 seconds
+            };
+
+            return websocket;
         };
 
-        return () => websocket.close();
-    }, [roomId]);
+        const websocket = connectWebSocket();
+
+        return () => {
+            if (websocket.readyState === WebSocket.OPEN) {
+                websocket.close();
+            }
+        };
+    }, [roomId]); // Add roomId to dependency array to ensure updates propagate
 
     const createRoom = () => {
-        if (ws && user && title) {
+        if (ws && ws.readyState === WebSocket.OPEN && user && title) {
             ws.send(JSON.stringify({ type: 'create', user, title }));
+        } else {
+            setError('Cannot create room: missing data or connection');
         }
     };
 
     const joinRoom = () => {
-        if (ws && roomId && user) {
+        if (ws && ws.readyState === WebSocket.OPEN && roomId && user) {
             ws.send(JSON.stringify({ type: 'join', roomId, user }));
+        } else {
+            setError('Cannot join room: missing data or connection');
         }
     };
 
     const submitVote = () => {
-        if (ws && roomId && user && vote) {
+        if (ws && ws.readyState === WebSocket.OPEN && roomId && user && vote !== null) {
             ws.send(JSON.stringify({ type: 'vote', roomId, user, vote }));
+            console.log('Vote submitted:', { roomId, user, vote });
+        } else {
+            setError('Cannot submit vote: missing data or connection');
+            console.log('Vote submission failed:', { ws, roomId, user, vote });
         }
     };
 
     const updateTitle = () => {
-        if (ws && roomId && user && title) {
+        if (ws && ws.readyState === WebSocket.OPEN && roomId && user && title) {
             ws.send(JSON.stringify({ type: 'updateTitle', roomId, user, title }));
         }
     };
 
     const flipVotes = () => {
-        if (ws && roomId && user) {
+        if (ws && ws.readyState === WebSocket.OPEN && roomId && user) {
             ws.send(JSON.stringify({ type: 'flip', roomId, user }));
         }
     };
 
     const resetVotes = () => {
-      if (ws && roomId && user) {
-          ws.send(JSON.stringify({ type: 'resetVotes', roomId, user }));
-      }
+        if (ws && ws.readyState === WebSocket.OPEN && roomId && user) {
+            ws.send(JSON.stringify({ type: 'resetVotes', roomId, user }));
+        }
     };
 
     const voteOptions = [1, 2, 3, 5, 8, 13, 20, 40, 100];
